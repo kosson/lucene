@@ -695,7 +695,7 @@ class LucenePlugin extends GenericPlugin {
 		$acceptedValues = array_keys($this->_getRankingBoostOptions());
 		$form =& $params[0];
 		$form->addCheck(
-			new FormValidatorInSet(
+		new \PKP\form\validation\FormValidatorInSet(
 				$form, 'rankingBoostOption', FORM_VALIDATOR_REQUIRED_VALUE,
 				'plugins.generic.lucene.sectionForm.rankingBoostInvalid',
 				$acceptedValues
@@ -1264,5 +1264,13 @@ class LucenePlugin extends GenericPlugin {
 			2 => __('plugins.generic.lucene.sectionForm.ranking.normal'),
 			4 => __('plugins.generic.lucene.sectionForm.ranking.high')
 		];
+	}
+
+	// https://github.com/pkp/lucene/commit/b2a418ed2e0ed3d87d90f079f3872d18740218d4
+	function getCanDisable() {
+    if ($this->getCurrentContextId() != \PKPApplication::CONTEXT_SITE && $this->getSetting(\PKPApplication::CONTEXT_SITE, 'enabled')) {
+        return false;
+    }
+    	return true;
 	}
 }

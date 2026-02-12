@@ -326,7 +326,7 @@ class SolrWebService {
 		} else {
 			$journalDao = DAORegistry::getDAO('JournalDAO'); /** @var JournalDAO $journalDao */
 			$journal = $journalDao->getById($journalId);
-			$journal =
+			//$journal =
 			$this->_journalCache[$journalId] = $journal;
 		}
 
@@ -1624,8 +1624,10 @@ class SolrWebService {
 
 					case 'suggestion':
 						$suggestions = [];
-						foreach($childNode->childNodes as $suggestionNode) {
-							$suggestions[] = $suggestionNode->textContent;
+						foreach($childNode->childNodes as $suggestionNodeChild) { // https://github.com/pkp/lucene/commit/7f7ed0d058be9fd35d0e32cbbdc3dcb3bb83ed81
+							if ($suggestionNodeChild->localName == 'str') {
+								$suggestions[] = $suggestionNodeChild->textContent;
+							}
 						}
 						break;
 				}
@@ -1695,8 +1697,10 @@ class SolrWebService {
 			$params['q'] = '*:*';
 		}
 		if ($fieldName == 'query') {
+			$params['qf'] = '*';	// https://github.com/pkp/lucene/commit/7f7ed0d058be9fd35d0e32cbbdc3dcb3bb83ed81
 			$params['facet.field'] = 'default_spell';
 		} else {
+			$params['q'] .= '*';	// https://github.com/pkp/lucene/commit/7f7ed0d058be9fd35d0e32cbbdc3dcb3bb83ed81
 			$params['facet.field'] = $fieldName . '_spell';
 		}
 		$facetPrefixLc = strtolower($facetPrefix);
