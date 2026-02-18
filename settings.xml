@@ -29,7 +29,7 @@
 	</setting>
 	<setting type="string">
 		<name>password</name>
-		<value>SolrRocks</value>
+		<value>SolrRocksNow</value>
 	</setting>
 	<setting type="string">
 		<name>instId</name>
@@ -100,4 +100,3 @@
 		<value>false</value>
 	</setting>
 </plugin_settings>
-

@@ -249,7 +249,7 @@ class SolrWebService {
 		if (!is_numeric($numProcessed)) return null;
 		$numProcessed = (integer)$numProcessed;
 		if ($numProcessed != $batchCount && $numProcessed != $batchCount - $numDeleted) {
-			$this->_serviceMessage = __(
+			$this->_serviceMessage = _(
 				'plugins.generic.lucene.message.indexingIncomplete',
 				['numProcessed' => $numProcessed, 'numDeleted' => $numDeleted, 'batchCount' => $batchCount]
 			);
@@ -846,8 +846,7 @@ class SolrWebService {
 		// Construct the main query.
 		$params = $this->_getSearchQueryParameters($searchRequest, $solr7);
 
-		// If we have no filters at all then return an
-		// empty result set.
+		// If we have no filters at all then return an empty result set.
 		if (!isset($params['q'])) return [];
 
 		// Pagination.

@@ -57,16 +57,15 @@ class LucenePlugin extends GenericPlugin {
 	/** @var array */
 	var $_facets;
 
-	public function __construct()
-	{
+	public function __construct(){
 		parent::__construct();
 		$this->application = Application::get()->getName();
 	}
 
-
 	//
 	// Getters and Setters
 	//
+
 	/**
 	 * Get the solr web service.
 	 * @return SolrWebService
@@ -159,7 +158,6 @@ class LucenePlugin extends GenericPlugin {
 			Hook::add('ArticleSearchIndex::submissionFileChanged', [$this, 'callbackSubmissionFileChanged']);
 			Hook::add('ArticleSearchIndex::submissionFileDeleted', [$this, 'callbackSubmissionFileDeleted']);
 			Hook::add('ArticleSearchIndex::submissionFilesChanged', [$this, 'callbackSubmissionFilesChanged']);
-
 			Hook::add('ArticleSearchIndex::submissionDeleted', [$this, 'callbackArticleDeleted']);
 			Hook::add('ArticleSearchIndex::articleDeleted', [$this, 'callbackArticleDeleted']);
 			Hook::add('ArticleSearchIndex::articleChangesFinished', [$this, 'callbackArticleChangesFinished']);
@@ -178,7 +176,6 @@ class LucenePlugin extends GenericPlugin {
 
 			PluginRegistry::register('blocks', new LuceneFacetsBlockPlugin($this), $this->getPluginPath());
 
-
 			// Register callbacks (view-level).
 			Hook::add('TemplateManager::display', [$this, 'callbackTemplateDisplay']);
 
@@ -187,7 +184,6 @@ class LucenePlugin extends GenericPlugin {
 
 			//used to show additional filters for selected facet values
 			Hook::add('Templates::Search::SearchResults::AdditionalFilters', [$this, 'callbackTemplateAdditionalFilters']);
-
 
 			// Called from template article_summary.tpl, used to add highlighted additional info to searchresult.
 			//As Templates::Search::SearchResults::AdditionalArticleLinks has been removed
@@ -214,14 +210,14 @@ class LucenePlugin extends GenericPlugin {
 	 * @see Plugin::getDisplayName()
 	 */
 	function getDisplayName() {
-		return __('plugins.generic.lucene.displayName');
+		return ('plugins.generic.lucene.displayName');
 	}
 
 	/**
 	 * @see Plugin::getDescription()
 	 */
 	function getDescription() {
-		return __('plugins.generic.lucene.description');
+		return ('plugins.generic.lucene.description');
 	}
 
 	/**
@@ -268,7 +264,7 @@ class LucenePlugin extends GenericPlugin {
 						$router->url($request, null, null, 'manage', null, array_merge($actionArgs, array('verb' => 'settings'))),
 						$this->getDisplayName()
 					),
-					__('manager.plugins.settings'),
+					('manager.plugins.settings'),
 					null
 				),
 			] : [],
@@ -334,7 +330,6 @@ class LucenePlugin extends GenericPlugin {
 					$form->readInputData();
 					if ($form->validate()) {
 						$form->execute();
-
 						return new JSONMessage(true);
 					}
 				}
@@ -343,14 +338,12 @@ class LucenePlugin extends GenericPlugin {
 					// that whatever data they may have entered into
 					// the form was not saved.
 					$form->initData();
-
 				}
 
 				return new JSONMessage(true, $form->fetch($request));
 		}
 		return parent::manage($args, $request);
 	}
-
 
 	//
 	// Application level hook implementations.
@@ -683,7 +676,6 @@ class LucenePlugin extends GenericPlugin {
 		return true;
 	}
 
-
 	//
 	// Form hook implementations.
 	//
@@ -780,7 +772,6 @@ class LucenePlugin extends GenericPlugin {
 		return false;
 	}
 
-
 	//
 	// View level hook implementations.
 	//
@@ -842,7 +833,6 @@ class LucenePlugin extends GenericPlugin {
 		$templateMgr->display($this->getTemplateResource('preResults.tpl'));
 
 		return false;
-
 	}
 
 	function callbackTemplateAdditionalFilters($hookName, $params) {
@@ -906,8 +896,7 @@ class LucenePlugin extends GenericPlugin {
 	 * @see templates/search/searchResults.tpl
 	 */
 	function callbackTemplateSimilarDocumentsLinks($hookName, $params) {
-		// Check whether the "similar documents" feature is
-		// enabled.
+		// Check whether the "similar documents" feature is enabled.
 		if (!$this->getSetting(0, 'simdocs')) return false;
 
 		$smarty =& $params[1];
@@ -959,9 +948,7 @@ class LucenePlugin extends GenericPlugin {
 		$templateMgr->display($this->getTemplateResource('additionalSectionMetadata.tpl'));
 
 		return false;
-
 	}
-
 
 	/**
 	 * Return the available options for result
@@ -1007,16 +994,14 @@ class LucenePlugin extends GenericPlugin {
 		];
 	}
 
-		//
+	//
 	// Private helper methods
 	//
 	/**
 	 * Return the currently selected result
 	 * set ordering option (default: descending relevance).
 	 * @param $journal Journal
-	 * @return array An array with the order field as the
-	 *  first entry and the order direction as the second
-	 *  entry.
+	 * @return array An array with the order field as the first entry and the order direction as the second entry.
 	 */
 	function _getResultSetOrdering($journal) {
 		// Retrieve the request.
@@ -1259,10 +1244,10 @@ class LucenePlugin extends GenericPlugin {
 	 */
 	function _getRankingBoostOptions() {
 		return [
-			0 => __('plugins.generic.lucene.sectionForm.ranking.never'),
-			1 => __('plugins.generic.lucene.sectionForm.ranking.low'),
-			2 => __('plugins.generic.lucene.sectionForm.ranking.normal'),
-			4 => __('plugins.generic.lucene.sectionForm.ranking.high')
+			0 => ('plugins.generic.lucene.sectionForm.ranking.never'),
+			1 => ('plugins.generic.lucene.sectionForm.ranking.low'),
+			2 => ('plugins.generic.lucene.sectionForm.ranking.normal'),
+			4 => ('plugins.generic.lucene.sectionForm.ranking.high')
 		];
 	}
 
