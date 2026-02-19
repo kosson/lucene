@@ -129,7 +129,7 @@ class LuceneFacetsBlockPlugin extends BlockPlugin {
 	/**
 	 * @see BlockPlugin::getBlockTemplateFilename()
 	 */
-	function getBlockTemplateFilename() {
+	function getBlockTemplateFilename(): string {
 		// Return the facets template.
 		return 'facetsBlock.tpl';
 	}

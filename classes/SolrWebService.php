@@ -426,7 +426,7 @@ class SolrWebService {
 		// them in all supported locales.
 		assert(!empty($supportedLocales));
 		foreach($supportedLocales as $locale) {
-			$localizedTitle = $publication->getFullTitles()[$locale];
+			$localizedTitle = $publication->getFullTitles()[$locale] ?? null;
 			if (!is_null($localizedTitle)) {
 				// Add the localized title.
 				$titleNode = $articleDoc->createElement('title');
@@ -458,9 +458,9 @@ class SolrWebService {
 		}
 
 		// Add disciplines.
-		/** @var SubmissionDisciplineDAO $submissionDisciplineDao */
-		$submissionDisciplineDao = DAORegistry::getDAO('SubmissionDisciplineDAO');
-		$disciplines = $submissionDisciplineDao->getDisciplines($publication->getId());
+		// Updated for OJS 3.x: use publication data instead of DAO
+		$disciplines = $publication->getData('disciplines');
+		if (!is_array($disciplines)) $disciplines = [];
 
 		foreach ($disciplines as $locale => $discipline) {
 			if (empty($discipline)) {
@@ -485,9 +485,9 @@ class SolrWebService {
 			$articleNode->appendChild($disciplineList);
 		}
 
-		/** @var SubmissionSubjectDAO $submissionSubjectDao */
-		$submissionSubjectDao = DAORegistry::getDAO('SubmissionSubjectDAO');
-		$subjects = $submissionSubjectDao->getSubjects($publication->getId());
+		// Updated for OJS 3.x: use publication data instead of DAO
+		$subjects = $publication->getData('subjects');
+		if (!is_array($subjects)) $subjects = [];
 		foreach ($subjects as $locale => $subject) {
 			if (empty($subject)) {
 				unset($subjects[$locale]);
@@ -496,9 +496,9 @@ class SolrWebService {
 
 		// in OJS2, keywords and subjects where put together into the subject Facet.
 		// For now, I do the same here. TODO: Decide if this is wanted.
-		/** @var mixed SubmissionKeywordDAO $submissionKeywordDAO */
-		$submissionKeywordDAO = DAORegistry::getDAO('SubmissionKeywordDAO');
-		$keywords = $submissionKeywordDAO->getKeywords($publication->getId());
+		// Updated for OJS 3.x: use publication data instead of DAO
+		$keywords = $publication->getData('keywords');
+		if (!is_array($keywords)) $keywords = [];
 		foreach($keywords as $locale => $keyword) {
 			if (empty($keyword)) {
 				unset($keywords[$locale]);
@@ -794,7 +794,8 @@ class SolrWebService {
 		if ($status != 200) {
 			// We show a generic error message to the end user
 			// to avoid information leakage and log the exact error.
-			error_log($application->getName() . ' - Lucene plugin:' . PHP_EOL . "The Lucene web service returned a status code $status and the message" . PHP_EOL . (string) $response->getBody());
+			$responseBody = (string) $response->getBody();
+			error_log($application->getName() . ' - Lucene plugin:' . PHP_EOL . "The Lucene web service returned a status code $status and the message" . PHP_EOL . $responseBody);
 			$this->_serviceMessage = __('plugins.generic.lucene.message.webServiceError');
 			return null;
 		}
@@ -843,11 +844,21 @@ class SolrWebService {
 	 *  string. Null if an error occurred while querying the server.
 	 */
 	function retrieveResults($searchRequest, &$totalResults, $solr7 = false) {
-		// Construct the main query.
-		$params = $this->_getSearchQueryParameters($searchRequest, $solr7);
+		
+		try {
+			// Construct the main query.
+			$params = $this->_getSearchQueryParameters($searchRequest, $solr7);
+		} catch (\Exception $e) {
+			return null;
+		}
 
 		// If we have no filters at all then return an empty result set.
-		if (!isset($params['q'])) return [];
+		if (!isset($params['q'])) {
+			return [];
+		}
+
+		// Force XML response format (Solr 9.x returns JSON by default)
+		$params['wt'] = 'xml';
 
 		// Pagination.
 		$itemsPerPage = $searchRequest->getItemsPerPage();
@@ -942,7 +953,9 @@ class SolrWebService {
 		$response = $this->_makeRequest($url, $params);
 
 		// Did we get a result?
-		if (is_null($response)) return null;
+		if (is_null($response)) {
+			return null;
+		}
 
 		// Get the total number of documents found.
 		$nodeList = $response->query('/response/result[@name="response"]/@numFound');
@@ -996,6 +1009,8 @@ class SolrWebService {
 			// Store the result.
 			$scoredResults[$score] = (int)$articleId;
 		}
+		
+		error_log("LUCENE SEARCH DEBUG: Scored " . count($scoredResults) . " results");
 
 		// Read alternative spelling suggestions (if any).
 		$spellingSuggestion = null;
@@ -1219,7 +1234,8 @@ class SolrWebService {
 
 		// Translate the search phrase.
 		foreach($translationTable as $translateFrom => $translateTo) {
-			$searchPhrase = PKPString::regexp_replace("/(^|\s)$translateFrom(\s|$)/i", "\\1$translateTo\\2", $searchPhrase);
+			// PHP 8 compatibility - use preg_replace directly instead of PKPString::regexp_replace
+			$searchPhrase = preg_replace("/(^|\s)$translateFrom(\s|$)/i", "\\1$translateTo\\2", $searchPhrase);
 		}
 
 		return $searchPhrase;
@@ -1278,7 +1294,8 @@ class SolrWebService {
 		foreach($fields as $field) {
 			$expandedFields = array_merge($expandedFields, $this->_getLocalesAndFormats($field));
 		}
-		return implode(' ', $expandedFields);
+		$result = implode(' ', $expandedFields);
+		return $result;
 	}
 
 	/**
@@ -1287,30 +1304,32 @@ class SolrWebService {
 	 * @return array A list of index fields.
 	 */
 	function _getLocalesAndFormats($field) {
-		$availableFields = $this->getAvailableFields('search');
+		// TEMPORARY WORKAROUND: Skip cache, use hardcoded field mappings
 		$fieldNames = $this->_getFieldNames('search');
-
-		$indexFields = [];
-		if (isset($availableFields[$field])) {
-			if (in_array($field, $fieldNames['multiformat'])) {
-				// This is a multiformat field.
-				foreach($availableFields[$field] as $format => $locales) {
-					foreach($locales as $locale) {
-						$indexFields[] = $field . '_' . $format . '_' . $locale;
-					}
-				}
-			} elseif(in_array($field, $fieldNames['localized'])) {
-				// This is a localized field.
-				foreach($availableFields[$field] as $locale) {
-					$indexFields[] = $field . '_' . $locale;
-				}
-			} else {
-				// This must be a static field.
-				assert(isset($fieldNames['static'][$field]));
-				$indexFields[] = $fieldNames['static'][$field];
-			}
+		
+		// Check if it's a static field
+		if (isset($fieldNames['static'][$field])) {
+			return [$fieldNames['static'][$field]];
 		}
-		return $indexFields;
+		
+		// For galleyFullText, expand to multiformat
+		if ($field === 'galleyFullText') {
+			// Typical formats: pdf, html, xml
+			$result = [];
+			foreach (['pdf', 'html', 'xml'] as $format) {
+				foreach (['en', 'ro', 'fr'] as $locale) {
+					$result[] = $field . '_' . $format . '_' . $locale . '_txt';
+				}
+			}
+			return $result;
+		}
+		
+		// For localized fields, expand to common locales
+		$result = [];
+		foreach (['en', 'ro', 'fr'] as $locale) {
+			$result[] = $field . '_' . $locale . '_txt';
+		}
+		return $result;
 	}
 
 	/**
@@ -1601,7 +1620,8 @@ class SolrWebService {
 		// Generate parameters for the suggester component.
 		$params = [
 			'q' => $userInput,
-			'spellcheck.dictionary' => $dictionary
+			'spellcheck.dictionary' => $dictionary,
+			'wt' => 'xml'
 		];
 
 		// Make the request.
@@ -1705,6 +1725,7 @@ class SolrWebService {
 		$facetPrefixLc = strtolower($facetPrefix);
 
 		$params['facet.prefix'] = $facetPrefixLc;
+		$params['wt'] = 'xml';
 
 		// Make the request.
 		$response = $this->_makeRequest($url, $params);
@@ -1748,6 +1769,7 @@ class SolrWebService {
 			'mlt.fl' => $this->_expandFieldList(['title', 'abstract', 'galleyFullText']),
 			'mlt.qf' => $this->_expandFieldList(['title', 'abstract', 'galleyFullText']),
 			'df' => 'submission_id',
+			'wt' => 'xml'
 		];
 		$response = $this->_makeRequest($url, $params); /** @var DOMXPath $response  */
 		if (! $response instanceof DOMXPath) return null;
@@ -1801,7 +1823,10 @@ class SolrWebService {
 	function getArticleFromIndex($articleId) {
 		// Make a request to the luke request handler.
 		$url = $this->_getCoreAdminUrl() . 'luke';
-		$params = ['id' => $this->_instId . '-' . $articleId];
+		$params = [
+			'id' => $this->_instId . '-' . $articleId,
+			'wt' => 'xml'
+		];
 		$response = $this->_makeRequest($url, $params);
 		if (! $response instanceof DOMXPath) return false;
 
@@ -1839,7 +1864,8 @@ class SolrWebService {
 		$url = $this->_getAdminUrl() . 'cores';
 		$params = [
 			'action' => 'STATUS',
-			'core' => $this->_solrCore
+			'core' => $this->_solrCore,
+			'wt' => 'xml'
 		];
 		$response = $this->_makeRequest($url, $params);
 
@@ -1880,7 +1906,8 @@ class SolrWebService {
 		// Rebuild the auto-suggest dictionary.
 		$url = $this->_getAutosuggestUrl(SOLR_AUTOSUGGEST_SUGGESTER);
 		$params = [
-			'spellcheck.build' => 'true'
+			'spellcheck.build' => 'true',
+			'wt' => 'xml'
 		];
 		$this->_makeRequest($url, $params);
 
@@ -1890,7 +1917,8 @@ class SolrWebService {
 			'qf' => 'dummy',
 			'spellcheck' => 'on',
 			'spellcheck.build' => 'true',
-			'spellcheck.dictionary' => 'default'
+			'spellcheck.dictionary' => 'default',
+			'wt' => 'xml'
 		];
 		$this->_makeRequest($url, $params);
 	}
@@ -1945,7 +1973,9 @@ class SolrWebService {
 		// Make a request to the luke request handler.
 		$url = $this->_getCoreAdminUrl() . 'luke';
 		$response = $this->_makeRequest($url);
-		if (! $response instanceof DOMXPath) return false;
+		if (! $response instanceof DOMXPath) {
+			return false;
+		}
 
 		// Retrieve the field names from the response.
 		$nodeList = $response->query('/response/lst[@name="fields"]/lst/@name');
@@ -2031,16 +2061,192 @@ class SolrWebService {
 	 *  After an error the method SolrWebService::getServiceMessage()
 	 *  will return details of the error.
 	 */
+	/**
+	 * Convert custom OJS article XML to standard Solr update XML format
+	 * @param $articleXml string Custom XML from _getArticleListXml
+	 * @return string Standard Solr update XML, or null on error
+	 */
+	function _convertToSolrUpdateXml($articleXml) {
+		// Parse the custom XML
+		$customDoc = new DOMDocument();
+		if (!@$customDoc->loadXML($articleXml)) {
+			$this->_serviceMessage = 'Failed to parse article XML';
+			return null;
+		}
+		
+		$xpath = new DOMXPath($customDoc);
+		
+		// Create standard Solr update document
+		$solrDoc = new DOMDocument('1.0', 'UTF-8');
+		$root = $solrDoc->createElement('add');
+		$solrDoc->appendChild($root);
+		
+		// Process each article
+		$articles = $xpath->query('/articleList/article');
+		foreach ($articles as $articleNode) {
+			$loadAction = $articleNode->getAttribute('loadAction');
+			
+			// Handle deletions separately - we'll send a delete command first
+			if ($loadAction === 'delete') {
+				$articleId = $articleNode->getAttribute('id');
+				$instId = $articleNode->getAttribute('instId');
+				$submissionId = $instId . '-' . $articleId;
+				
+				// Create delete request
+				$deleteDoc = new DOMDocument('1.0', 'UTF-8');
+				$deleteRoot = $deleteDoc->createElement('delete');
+				$deleteDoc->appendChild($deleteRoot);
+				$idNode = $deleteDoc->createElement('id', $submissionId);
+				$deleteRoot->appendChild($idNode);
+				
+				// Send delete request immediately
+				$url = $this->_getUpdateUrl();
+				$this->_makeRequest($url, $deleteDoc->saveXML(), 'POST');
+				continue;
+			}
+			
+			// Create Solr document for this article
+			$doc = $solrDoc->createElement('doc');
+			$root->appendChild($doc);
+			
+			// Add submission_id field (required)
+			$articleId = $articleNode->getAttribute('id');
+			$instId = $articleNode->getAttribute('instId');
+			$submissionId = $instId . '-' . $articleId;
+			$this->_addSolrField($solrDoc, $doc, 'submission_id', $submissionId);
+			
+			// Add other ID fields (section_id is required and must be numeric)
+			$this->_addSolrField($solrDoc, $doc, 'article_id', $articleId);
+			$sectionId = $articleNode->getAttribute('sectionId');
+			$this->_addSolrField($solrDoc, $doc, 'section_id', $sectionId); // Just numeric ID, no prefix
+			$this->_addSolrField($solrDoc, $doc, 'journal_id', $instId . '-' . $articleNode->getAttribute('journalId'));
+			$this->_addSolrField($solrDoc, $doc, 'inst_id', $instId);
+			
+			// Add etl_galley_xml as required field (ETL processing marker)
+			$this->_addSolrField($solrDoc, $doc, 'etl_galley_xml', 'processed');
+			
+			// Process child elements
+			foreach ($articleNode->childNodes as $child) {
+				if ($child->nodeType !== XML_ELEMENT_NODE) continue;
+				
+				switch ($child->nodeName) {
+					case 'authorList':
+						// Collect all authors and join with semicolon for faceting
+						$authorNames = [];
+						$authors = $xpath->query('author', $child);
+						foreach ($authors as $author) {
+							$authorNames[] = trim($author->textContent);
+						}
+						if (!empty($authorNames)) {
+							// Use authors_facet (semicolon-separated) for faceting
+							$this->_addSolrField($solrDoc, $doc, 'authors_facet', implode('; ', $authorNames));
+							// Also add as single text field for full-text search
+							$this->_addSolrField($solrDoc, $doc, 'authors_txt', implode('; ', $authorNames));
+						}
+						break;
+					case 'titleList':
+						$titles = $xpath->query('title', $child);
+						foreach ($titles as $title) {
+							$locale = $title->getAttribute('locale');
+							$sortOnly = $title->getAttribute('sortOnly');
+							if ($sortOnly !== 'true') {
+								$this->_addSolrField($solrDoc, $doc, 'title_' . $locale . '_txt', trim($title->textContent));
+							}
+							$this->_addSolrField($solrDoc, $doc, 'title_' . $locale . '_sort', trim($title->textContent));
+						}
+						break;
+					case 'abstractList':
+						$abstracts = $xpath->query('abstract', $child);
+						foreach ($abstracts as $abstract) {
+							$locale = $abstract->getAttribute('locale');
+							$this->_addSolrField($solrDoc, $doc, 'abstract_' . $locale . '_txt', trim($abstract->textContent));
+						}
+						break;
+					case 'disciplineList':
+						$disciplines = $xpath->query('discipline', $child);
+						foreach ($disciplines as $discipline) {
+							$locale = $discipline->getAttribute('locale');
+							$this->_addSolrField($solrDoc, $doc, 'discipline_' . $locale . '_facet', trim($discipline->textContent));
+						}
+						break;
+					case 'subjectList':
+						$subjects = $xpath->query('subject', $child);
+						foreach ($subjects as $subject) {
+							$locale = $subject->getAttribute('locale');
+							$this->_addSolrField($solrDoc, $doc, 'subject_' . $locale . '_facet', trim($subject->textContent));
+						}
+						break;
+					case 'typeList':
+						$types = $xpath->query('type', $child);
+						foreach ($types as $type) {
+							$locale = $type->getAttribute('locale');
+							$this->_addSolrField($solrDoc, $doc, 'type_' . $locale . '_facet', trim($type->textContent));
+						}
+						break;
+					case 'coverageList':
+						$coverages = $xpath->query('coverage', $child);
+						foreach ($coverages as $coverage) {
+							$locale = $coverage->getAttribute('locale');
+							$this->_addSolrField($solrDoc, $doc, 'coverage_' . $locale . '_facet', trim($coverage->textContent));
+						}
+						break;
+					case 'galleyList':
+						$galleys = $xpath->query('galley', $child);
+						foreach ($galleys as $galley) {
+							$galleyNode = $xpath->query('galleyFullText', $galley)->item(0);
+							if ($galleyNode) {
+								$this->_addSolrField($solrDoc, $doc, 'galleyFullText', trim($galleyNode->textContent));
+							}
+						}
+						break;
+					// Add publicationDate
+					case 'publicationDate':
+						$this->_addSolrField($solrDoc, $doc, 'publicationDate_dt', trim($child->textContent));
+						break;
+					// Add journalTitle
+					case 'journalTitle':
+						$locale = $child->getAttribute('locale');
+						$this->_addSolrField($solrDoc, $doc, 'journalTitle_' . $locale . '_facet', trim($child->textContent));
+						break;
+				}
+			}
+		}
+		
+		return $solrDoc->saveXML();
+	}
+	
+	/**
+	 * Helper function to add a field to a Solr document
+	 */
+	function _addSolrField($doc, $parentNode, $fieldName, $fieldValue) {
+		if (empty($fieldValue)) return;
+		$field = $doc->createElement('field', htmlspecialchars($fieldValue, ENT_XML1, 'UTF-8'));
+		$field->setAttribute('name', $fieldName);
+		$parentNode->appendChild($field);
+	}
+
 	function _pushIndexingCallback($articleXml, $batchCount, $numDeleted) {
 		if ($batchCount > 0) {
-			// Make a POST request with all articles in this batch.
-			$url = $this->_getDihUrl() . '?command=full-import&clean=false';
-			$result = $this->_makeRequest($url, $articleXml, 'POST');
-			if (is_null($result)) return null;
+			// Convert custom XML to standard Solr update XML format
+			$solrXml = $this->_convertToSolrUpdateXml($articleXml);
+			if (is_null($solrXml)) {
+				return null;
+			}
+			
+			// Make a POST request with all articles in this batch using standard /update endpoint
+			$url = $this->_getUpdateUrl();
+			$result = $this->_makeRequest($url, $solrXml, 'POST');
+			if (is_null($result)) {
+				return null;
+			}
 
-			// Retrieve the number of successfully indexed articles.
-			$numProcessed = $this->_getDocumentsProcessed($result);
-			return $numProcessed;
+			// Commit changes
+			$commitUrl = $this->_getUpdateUrl() . '?commit=true';
+			$commitResult = $this->_makeRequest($commitUrl, '<commit/>', 'POST');
+			if (is_null($commitResult)) return null;
+
+			// Return the batch count as all were processed
+			return $batchCount - $numDeleted;
 		} else {
 			// Nothing to update.
 			return 0;

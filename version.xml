@@ -2,7 +2,7 @@
 <!DOCTYPE version SYSTEM "../../../lib/pkp/dtd/pluginVersion.dtd">
 
 <!--
-  * version.xml
+  * plugins/generic/lucene/version.xml
   *
   * Copyright (c) 2014-2023 Simon Fraser University
   * Copyright (c) 2003-2023 John Willinsky

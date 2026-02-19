@@ -40,7 +40,7 @@ Solr and Jetty distributions. These projects are governed by the Apache
 License 2.0. We therefore included a copy of this license in the root
 directory of this plug-in, see LICENSE-APACHE-2.0.txt.
 
-For more details please visit the Solr web site: https://lucene.apache.org/solr/
+For more details please visit the Solr web site: https://solr.apache.org/
 
 ### Demonstrations
 
@@ -204,8 +204,7 @@ or higher. If you are on Linux then install a J2SE compliant Java
 package. If you are on Windows you may get the latest J2SE version
 from http://java.com/en/download/index.jsp.
 
-2\) Install the OJS Lucene Plugin either from the OJS plugin gallery or
-from https://github.com/ojsde/lucene
+2\) Install the OJS Lucene Plugin either from the OJS plugin
 
 If you install the OJS Lucene plugin for an additional OJS
 installation (i.e. you already have a running Solr server) please
@@ -312,6 +311,7 @@ immediately.
 In the standard configuration Basic Authentication is used, and
 configured in the file `plugins/generic/lucene/embedded/solr910/security.json`. 
 The standard admin username and password are `solr` and `SolrRocks`.
+For this verson of the plugin, `SolrRocksNow` is used as password.
 
 If you want to change to another authentication method, please
 consult the [documentation](https://lucene.apache.org/solr/guide/8\_1/authentication-and-authorization-plugins.htm)
@@ -321,19 +321,27 @@ One way to change the password once the server is running
 complete step 5 and use the following command from the commandline,
 replacing PLEASE CHANGE with the new password:
 
-Temporarily make security.json writeable: `sudo chmod g+w security.json`
-
-Change password:
+Temporarily make `security.json` writeable:
 
 ```bash
-curl --user solr:SolrRocks  http://localhost:8983/api/cluster/security/authentication -H  'Content-type:application/json' -d '{"set-user": {"solr":"PLEASE> CHANGE"}}'
+sudo chmod g+w security.json
 ```
 
-Secure credentials file: `sudo chmod g-w security.json`
+Change password to `SolrRocksNow`:
+
+```bash
+curl --user solr:SolrRocks  http://localhost:8983/api/cluster/security/authentication -H  'Content-type:application/json' -d '{"set-user": {"solr":"SolrRocksNow"}}'
+```
+
+Secure credentials file:
+
+```bash
+sudo chmod g-w security.json
+```
 
 This command will change the file
 `plugins/generic/lucene/embedded/solr81/security.json`, so if you upload
-this file again, the password will be reset to `SolrRocks`.
+this file again, the password will be reset to `SolrRocksNow`.
 
 7\) Now open up your web browser and log into your OJS journal manager
 account.
@@ -348,7 +356,11 @@ provide the admin username and password (see step 6).
 Back to the command line go to the tools directory and execute the
 script to rebuild your index.
 
-On Linux and from the OJS directory this becomes: `php tools/rebuildSearchIndex.php -d`
+On Linux and from the OJS directory this becomes:
+
+```bash
+php tools/rebuildSearchIndex.php -d
+```
 
 You should see output similar to this:
 
@@ -401,7 +413,7 @@ your server environemnt.
 in your Jetty and Solr installation, respectively.
 
 You'll probably have to change paths and security configuration in
-jetty.xml, webdefault.xml and solrconfig.xml.
+`jetty.xml`, `webdefault.xml` and `solrconfig.xml`.
 
 In most cases you can leave dih-ojs.xml and schema.xml unchanged.
 You may want to have a look at the analysis and query chains in
@@ -450,7 +462,11 @@ then you'll need three distinct installation IDs.
 
 For each installation separately you'll have to drop to the command
 line, go to the tools directory and execute the script to rebuild
-your index for that installation: `cd tools php rebuildSearchIndex.php -d`
+your index for that installation:
+
+```bash
+cd tools php rebuildSearchIndex.php -d
+```
 
 You should see output similar to this:
 
@@ -518,7 +534,11 @@ public content will be index by Solr.
 - If your index contains data and you still do not get any search
 results in OJS then try deleting your cache.
 
-You can execute: `rm cache/fc-plugins-lucene-fieldCache.php`
+You can execute:
+
+```bash
+rm cache/fc-plugins-lucene-fieldCache.php
+```
 
 Alternatively you can delete the cache via OJS' administrator tools.
 
@@ -536,7 +556,7 @@ written by the Solr server. Sometimes a solution to your problem may
 be obvious from the error messages, e.g. in the case of permission
 problems or erroneous symlinks. If you have difficulties in
 interpreting error messages in the log then please register a bug
-report at 'https://github.com/pkp/pkp-lib\#issues' and post the most
+report at `https://github.com/pkp/pkp-lib\#issues` and post the most
 recent error message. This will help OJS developers to resolve your
 problem.
 
@@ -629,10 +649,10 @@ change the Authentification Credentials if you have changed them, -
 enable pull-processing in the Lucene plugin settings of all OJS clients,
 
 - schedule the pull download script
-(`plugins/generic/lucene/embedded/bin/ pull.sh`) on the Solr server,
+(`plugins/generic/lucene/embedded/bin/pull.sh`) on the Solr server,
 e.g. as a cron job. We recommend scheduling this script once or twice a
 day during off-hours when server load is low. - schedule the load
-processing script (`plugins/generic/lucene/embedded/bin/ load.sh`) on
+processing script (`plugins/generic/lucene/embedded/bin/load.sh`) on
 the Solr server, e.g. as a cron job. We recommend scheduling this script
 about every 15 minutes. It polls the staging folder and will do nothing
 if no files are staged for load. - regularly monitor the staging, reject
@@ -718,35 +738,38 @@ no journal path wil re-index all journals of the installation.
 
 The options are:
 
-> -d Rebuild dictionaries.
-
-> -b Update usage statistics (see Ranking by Usage Statistics,
-> above).
-
-> -n Do not re-index any articles. If this option is given together
-> with a journal path then the journal path will be ignored.
-
-> -h Display usage information.
+- `-d` Rebuild dictionaries.
+- `-b` Update usage statistics (see Ranking by Usage Statistics, above).
+- `-n` Do not re-index any articles. If this option is given together with a journal path then the journal path will be ignored.
+- `-h` Display usage information.
 
 Examples:
 
 To rebuild all journals without rebuilding dictionaries:
 
-`php tools/rebuildSearchIndex.php`
+```bash
+php tools/rebuildSearchIndex.php
+```
 
 To rebuild only the dictionaries:
 
-`php tools/rebuildSearchIndex.php -d -n`
+```bash
+php tools/rebuildSearchIndex.php -d -n
+```
 
 To rebuild the dictionaries, refresh usage statistics and re-index
 all journals of an installation:
 
-`php tools/rebuildSearchIndex.php -d -b`
+```bash
+php tools/rebuildSearchIndex.php -d -b
+```
 
 To rebuild the index of a single journal without rebuilding
 dictionaries:
 
-`php tools/rebuildSearchIndex.php some-journal-path`
+```bash
+php tools/rebuildSearchIndex.php some-journal-path
+```
 
 Automated maintenance:
 
@@ -783,15 +806,17 @@ If you want to customize language support (e.g. remove a stemmer, add
 stopwords, add synonyms, etc.) then you can do so in the schema file
 (plugins/generic/ lucene/embedded/solr/conf/schema.xml). Please make
 sure you understand the Solr analysis process first. You may want to
-read: - https://wiki.apache.org/solr/AnalyzersTokenizersTokenFilters -
-https://wiki.apache.org/solr/LanguageAnalysis
+read:
+
+- https://solr.apache.org/guide/solr/latest/indexing-guide/tokenizers.html,
+- https://solr.apache.org/guide/solr/latest/indexing-guide/language-analysis.html
 
 Our schema works with dynamic types. There is one field type for each
 language. The OJS locale-language assignment is then done with dynamic
 fields. You find both, the type definition and the dynamic field
-definition in the schema.xml file.
+definition in the `schema.xml` file.
 
-Let's take support for German as an example: First the schema.xml file
+Let's take support for German as an example: First the `schema.xml` file
 contains the type definition:
 
 ```xml
@@ -815,7 +840,7 @@ default import configuration will deal automatically with new languages.
 To add additional stopwords you have to find the stopword list
 corresponding to the language you are customizing. You find the default
 stopword lists in the folder
-`plugins/generic/lucene/embedded/solr81/conf/lang`. You can edit these
+`plugins/generic/lucene/embedded/solr910/conf/lang`. You can edit these
 files manually and then restart the Solr process. This should be enough
 to introduce the new stopwords.
 
@@ -898,3 +923,55 @@ displayed in the sidebar. You can determine the position of the facets
 block under 'Settings / Website / Appearance' below Sidebar Management.
 It is recommended to move the Lucene Faceting Block to the top of the
 sidebar.
+
+## Upgrade notes
+
+This version is working on 3.5.0-1 version of OJS. It is designed to work with existing working Solr service. In this case, the version installed and configured is 9.10.1, released on 20th of January, 2026.
+The embed solution was not tested.
+There is a copy of the core files in the subdirectory `the-core`. These files are necesassary to make the plugin work.
+Be very careful when configuring the plugin. The URL needed has to be a FQDN; `localhost` or `127.0.0.1` doesn't work. If you test on local or virtual machine set a `test.local` or the like.
+
+### Changes 19th February, 2026
+
+General overview of the mods:
+
+PHP 8 Compatibility - Added return type declarations
+UI Translation - Fixed locale key translation
+Null Handling - Prevented fatal errors in search results
+OJS 3.x Compatibility - Replaced deprecated DAO classes with modern Publication API
+Solr 9.x Compatibility - Replaced Data Import Handler with standard /update endpoint
+Field Requirements - Fixed required fields (submission_id, section_id, etl_galley_xml)
+MultiValued Fields - Fixed authors field to use semicolon separation
+
+#### Solr Configuration (/var/solr/data/ojs/conf/solrconfig.xml)
+
+Added qf parameter with field boosting: title_en_txt^3 abstract_en_txt^1 authors_txt^2 subject_en_facet^1.5
+Commented out DIH request handler completely
+
+##### Plugin Code (SolrWebService.php)
+
+Added 'wt' => 'xml' parameter to all 7 functions that make GET requests to Solr:
+
+retrieveResults() - Main search function
+_getSuggesterAutosuggestions() - Auto-complete suggestions
+_getFacetingAutosuggestions() - Facet suggestions
+getInterestingTerms() - "More like this" feature
+getArticleFromIndex() - Debugging function
+rebuildDictionaries() - Dictionary building
+
+Critical Bugs Fixed:
+`PKPString::regexp_replace()` removed in OJS 3.5
+
+Fixed in SolrWebService.php
+Changed to use native `preg_replace()` instead
+Cache infinite recursion issue
+
+The getAvailableFields() function was calling `_cacheMiss()` which made Luke requests
+Solution: Implemented hardcoded field expansion in `_getLocalesAndFormats()` to bypass the cache completely
+Fixed in SolrWebService.php
+
+Results array assignment bug
+
+Results were only being assigned when facets were present
+Fixed: Moved `$results = $result['scoredResults']` outside the facets conditional
+Fixed in LucenePlugin.php

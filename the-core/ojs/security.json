@@ -1,0 +1,14 @@
+{
+  "authentication":{
+    "blockUnknown":true,
+    "class":"solr.BasicAuthPlugin",
+    "credentials":{"solr":"5lb4kxVnFA/EEWZ/SvaRuxqaybfMxB2GCcpUvuufJ6s= eTXS86Vv+DV47PqtxOZT4I2tDCAVVrBZYkKAmsGi5C4="},
+    "realm":"Utilizatorii Solr",
+    "forwardCredentials":false,
+    "":{"v":0}},
+  "authorization":{
+    "class":"solr.RuleBasedAuthorizationPlugin",
+    "permissions":[{
+        "name":"security-edit",
+        "role":"admin"}],
+    "user-role":{"solr":"admin"}}}

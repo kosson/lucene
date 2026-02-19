@@ -2,7 +2,7 @@
 <!DOCTYPE plugin_settings SYSTEM "../../../lib/pkp/dtd/pluginSettings.dtd">
 
 <!--
-  * settings.xml
+  * plugins/generic/solr/settings.xml
   *
   * Copyright (c) 2014-2023 Simon Fraser University
   * Copyright (c) 2003-2023 John Willinsky
@@ -25,7 +25,7 @@
 	</setting>
 	<setting type="string">
 		<name>username</name>
-		<value>solr</value>
+		<value>nicolaie</value>
 	</setting>
 	<setting type="string">
 		<name>password</name>

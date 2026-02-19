@@ -36,6 +36,9 @@ define('LUCENE_PLUGIN_DEFAULT_RANKING_BOOST', 1.0); // Default: No boost (=weigh
 
 class LucenePlugin extends GenericPlugin {
 
+	/** @var string */
+	var $application;
+
 	/** @var SolrWebService */
 	var $_solrWebService;
 
@@ -104,7 +107,24 @@ class LucenePlugin extends GenericPlugin {
 	 */
 	function getMailTemplate($emailKey, $journal = null) {
 		if (!isset($this->_mailTemplates[$emailKey])) {
+			if (!class_exists('MailTemplate')) {
+				return null;
+			}
+
+			$mailTemplateClass = new \ReflectionClass('MailTemplate');
+			$constructor = $mailTemplateClass->getConstructor();
+			if (
+				is_null($constructor)
+				|| (!$constructor->isVariadic() && $constructor->getNumberOfParameters() < 5)
+			) {
+				return null;
+			}
+
 			$mailTemplate = new MailTemplate($emailKey, null, $journal, true, true);
+			if (!method_exists($mailTemplate, 'assignParams') || !method_exists($mailTemplate, 'addRecipient') || !method_exists($mailTemplate, 'send')) {
+				return null;
+			}
+
 			$this->_mailTemplates[$emailKey] = $mailTemplate;
 		}
 
@@ -200,6 +220,7 @@ class LucenePlugin extends GenericPlugin {
 			$username = $this->getSetting(CONTEXT_SITE, 'username');
 			$password = $this->getSetting(CONTEXT_SITE, 'password');
 			$instId = $this->getSetting(CONTEXT_SITE, 'instId');
+			
 			$this->_solrWebService = new SolrWebService($searchHandler, $username, $password, $instId);
 		}
 
@@ -210,14 +231,14 @@ class LucenePlugin extends GenericPlugin {
 	 * @see Plugin::getDisplayName()
 	 */
 	function getDisplayName() {
-		return ('plugins.generic.lucene.displayName');
+		return __('plugins.generic.lucene.displayName');
 	}
 
 	/**
 	 * @see Plugin::getDescription()
 	 */
 	function getDescription() {
-		return ('plugins.generic.lucene.description');
+		return __('plugins.generic.lucene.description');
 	}
 
 	/**
@@ -232,13 +253,6 @@ class LucenePlugin extends GenericPlugin {
 	 */
 	function getInstallEmailTemplatesFile() {
 		return ($this->getPluginPath() . '/emailTemplates.xml');
-	}
-
-	/**
-	 * @see Plugin::getInstallEmailTemplateDataFile()
-	 */
-	function getInstallEmailTemplateDataFile() {
-		return ($this->getPluginPath() . '/locale/{$installedLocale}/emailTemplates.xml');
 	}
 
 	/**
@@ -264,7 +278,7 @@ class LucenePlugin extends GenericPlugin {
 						$router->url($request, null, null, 'manage', null, array_merge($actionArgs, array('verb' => 'settings'))),
 						$this->getDisplayName()
 					),
-					('manager.plugins.settings'),
+					__('manager.plugins.settings'),
 					null
 				),
 			] : [],
@@ -480,12 +494,15 @@ class LucenePlugin extends GenericPlugin {
 		// Call the solr web service.
 		$solrWebService = $this->getSolrWebService();
 		$result = $solrWebService->retrieveResults($searchRequest, $totalResults, $this->getSetting(CONTEXT_SITE, 'useSolr7'));
+		
 		if (is_null($result)) {
 			$error = $solrWebService->getServiceMessage();
 			$this->_informTechAdmin($error, $journal, true);
 			$error .= ' ' . __('plugins.generic.lucene.message.techAdminInformed');
-
-			return [];
+			// Initialize results to empty to prevent null errors
+			$totalResults = 0;
+			$results = [];
+			return true;
 		} else {
 			// Store spelling suggestion, highlighting and faceting info
 			// internally. We cannot route these back through the request
@@ -522,11 +539,25 @@ class LucenePlugin extends GenericPlugin {
 			if (!empty($facetCategories) && isset($result['facets'])) {
 				$this->_facets = $result['facets'];
 			}
-
-			// Return the scored results.
-			if (isset($result['scoredResults']) && !empty($result['scoredResults'])) {
+			
+			// Process scored results
+			if (isset($result['scoredResults'])) {
 				$results = $result['scoredResults'];
+			} else {
+				// If no results, initialize to empty array to prevent null errors
+				$results = [];
 			}
+			
+			// Ensure totalResults is always set to prevent null errors
+			if (!is_int($totalResults)) {
+				$totalResults = 0;
+			}
+			
+			// Ensure totalResults is always set to prevent null errors
+			if (!is_int($totalResults)) {
+				$totalResults = 0;
+			}
+			
 			return true;
 		}
 	}
@@ -564,10 +595,11 @@ class LucenePlugin extends GenericPlugin {
 	function callbackSubmissionFileChanged($hookName, $params) {
 		assert($hookName == 'ArticleSearchIndex::submissionFileChanged');
 		list($articleId, $type, $fileId) = $params;
-		$this->_solrWebService->setArticleStatus($article->getId());
+		$this->_solrWebService->setArticleStatus($articleId);
+		$submission = Repo::submission()->get($articleId);
 		// in OJS core in many cases callbackArticleChangesFinished is not called.
 		// So we call it ourselves, it won't do anything is pull-indexing is active
-		$this->callbackArticleChangesFinished(null, null,$article->getData('contextId'));
+		$this->callbackArticleChangesFinished(null, null, $submission?->getData('contextId'));
 
 		return true;
 	}
@@ -578,7 +610,7 @@ class LucenePlugin extends GenericPlugin {
 	function callbackSubmissionFileDeleted($hookName, $params) {
 		assert($hookName == 'ArticleSearchIndex::submissionFileDeleted');
 		list($articleId, $type, $assocId) = $params;
-		$this->_solrWebService->setArticleStatus($article->getId());
+		$this->_solrWebService->setArticleStatus($articleId);
 
 		return true;
 	}
@@ -706,9 +738,9 @@ class LucenePlugin extends GenericPlugin {
 
 		// Read the section's ranking boost.
 		$rankingBoost = LUCENE_PLUGIN_DEFAULT_RANKING_BOOST;
-		$journal = Application::get()->getRequest()->getJournal();
+		$journal = Application::get()->getRequest()->getContext();
 		$section = null;
-		if ($form->getSectionId()) {
+		if ($form->getSectionId() && $journal instanceof \APP\journal\Journal) {
 			$section = Repo::section()->get($form->getSectionId(), $journal->getId());
 		}
 
@@ -759,14 +791,15 @@ class LucenePlugin extends GenericPlugin {
 			$rankingBoost = LUCENE_PLUGIN_DEFAULT_RANKING_BOOST;
 		}
 
-		$journal = Application::get()->getRequest()->getJournal();
+		$journal = Application::get()->getRequest()->getContext();
 
 		// Get or create the section object
-		if ($form->getSectionId()) {
+		if ($form->getSectionId() && $journal instanceof \APP\journal\Journal) {
 			$section = Repo::section()->get($form->getSectionId(), $journal->getId());
-			// Update the ranking boost of the section.
-			$section->setData('rankingBoost', $rankingBoost);
-			Repo::section()->edit($section, ['rankingBoost']);
+			if ($section instanceof \APP\section\Section) {
+				$section->setData('rankingBoost', $rankingBoost);
+				Repo::section()->edit($section, ['rankingBoost']);
+			}
 		}
 
 		return false;
@@ -1223,6 +1256,8 @@ class LucenePlugin extends GenericPlugin {
 				$mail = $this->getMailTemplate('LUCENE_ARTICLE_INDEXING_ERROR_NOTIFICATION');
 			}
 		}
+
+		if (is_null($mail)) return;
 
 		// Assign parameters.
 		$request = Application::get()->getRequest();
